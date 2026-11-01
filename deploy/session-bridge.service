@@ -1,0 +1,20 @@
+[Unit]
+Description=Grok Bot x Rokid glasses session-bridge (port 8787)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=leqi-bridge
+WorkingDirectory=/opt/leqi-grokbot-bridge/session-bridge
+EnvironmentFile=/etc/leqi-grokbot-bridge.env
+ExecStart=/usr/bin/env node server.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/leqi-grokbot-bridge/session-bridge/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+# Example Prism Hub config for a hub host (placeholders only)
+# Real file on VM: /var/lib/prism-hub/.prism/config.yaml (mode 600)
+account: {}
+bridge:
+  enabled: true
+  keep_awake: false
+  plugin_dirs:
+  - /var/lib/prism-hub/.prism/pluginbridge-plugins
+  plugins:
+    grokbot:
+      enabled: true
+      env:
+        BRIDGE_TOKEN: <PLACEHOLDER_BRIDGE_TOKEN>
+        GROKBOT_CWD: grokbot
+        SESSION_BRIDGE_URL: http://127.0.0.1:8787
+prism:
+  host_token: ''
+  region: cn

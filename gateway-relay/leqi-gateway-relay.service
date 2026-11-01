@@ -1,0 +1,18 @@
+[Unit]
+Description=Leqi Grok Bot gateway relay (local → session-bridge)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/leqi-grokbot-bridge/gateway-relay
+# Prefer EnvironmentFile for BRIDGE_TOKEN; fall back to reading ~/.secrets in relay.js
+Environment=SESSION_BRIDGE_URL=https://glasses.example.com
+EnvironmentFile=-%h/.config/leqi-gateway-relay.env
+ExecStart=/usr/bin/env node relay.js
+Restart=always
+RestartSec=5
+# Do not expose gateway; relay only uses 127.0.0.1:1340
+
+[Install]
+WantedBy=default.target

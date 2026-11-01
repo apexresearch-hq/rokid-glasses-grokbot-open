@@ -1,0 +1,15 @@
+{
+  "name": "leqi-grokbot-gateway-relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local relay: claim jobs from session-bridge, sendPrompt via Grok Bot gateway, ingest replies",
+  "main": "relay.js",
+  "scripts": {
+    "start": "node relay.js",
+    "smoke": "node smoke.js",
+    "test": "node test/unit.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

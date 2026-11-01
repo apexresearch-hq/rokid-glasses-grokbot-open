@@ -1,0 +1,44 @@
+# Draft manifest for Prism Hub side-load.
+# Schema: PluginBridge v4 (see Rokid-Prism/prism-plugin-sdk conformance/manifest.schema.json)
+# Built on @rokid-prism/pluginbridge-plugin-sdk 0.1.1 (bundled in node_modules). Side-load via Hub plugin_dirs.
+
+id: grokbot
+schema_version: 1
+display_name: Grok Bot
+description: >
+  Protocol-native bridge from Prism (glasses / Panel) to a cloud session-bridge
+  that wakes Grok Bot via Routine webhook and stores full replies as novel-style chapters.
+version: 0.2.0
+plugin_protocol_version: "4"
+min_hub_version: 0.1.0
+integration_mode: protocol-native
+transport: process
+runtime_modes: [native]
+default_runtime_mode: native
+runtime_controls:
+  native:
+    model: stable
+runtime_operations:
+  native:
+    rename: unsupported
+    pin: unsupported
+    archive: unsupported
+    delete: unsupported
+# Hub launches this process and speaks PluginBridge v4 over JSON-lines stdio.
+# Prefer Hub-managed Node when packaging: ["${runtime.node}", "src/plugin.js"]
+command: ["node", "src/plugin.js"]
+capabilities:
+  native_visible_input: true
+  native_visible_output: true
+  can_attach_session: true
+  can_start_session_with_message: true
+  can_list_sessions: true
+  can_read_history: true
+  can_interrupt: true
+  can_approval: true
+  can_forward_sync: true
+  can_reverse_sync: true
+  can_plugin_wide_watch: true
+  can_wait_run: true
+  can_read_status: true
+  can_control_session: true

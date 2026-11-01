@@ -1,0 +1,20 @@
+{
+  "name": "prism-plugin-grokbot",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Rokid Prism PluginBridge v4 plugin: glasses -> session-bridge -> Grok Bot routine webhook, novel-style paged replies",
+  "main": "src/plugin.js",
+  "bin": {
+    "prism-plugin-grokbot": "src/plugin.js"
+  },
+  "scripts": {
+    "start": "node src/plugin.js",
+    "test": "node test/run.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@rokid-prism/pluginbridge-plugin-sdk": "^0.1.1"
+  }
+}

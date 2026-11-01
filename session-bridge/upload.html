@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>发给 Grok Bot</title>
+<style>
+body{font-family:-apple-system,system-ui,sans-serif;margin:0;padding:16px;background:#0d1117;color:#e6edf3;max-width:560px;margin:auto}
+h1{font-size:20px}label{display:block;margin:14px 0 6px;color:#9da7b3;font-size:14px}
+input,textarea,select,button{width:100%;box-sizing:border-box;font-size:16px;padding:10px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3}
+button{background:#2ea043;border:0;font-weight:600;margin-top:16px}button.sec{background:#30363d}
+#log{white-space:pre-wrap;font-size:14px;margin-top:14px;color:#9da7b3}.hide{display:none}.row{display:flex;gap:8px}.row button{margin-top:8px}
+</style></head><body>
+<h1>📎 发图片 / 文件给 Grok Bot</h1>
+<div id="tokBox" class="hide">
+  <label>访问令牌（只需输入一次，保存在本机浏览器）</label>
+  <input id="tok" type="password" autocomplete="off">
+  <button id="saveTok">保存令牌</button>
+</div>
+<div id="main" class="hide">
+  <label>选择照片或文件（≤10MB，可多选）</label>
+  <div class="row"><button class="sec" id="pickImg" type="button">🖼 相册</button><button class="sec" id="pickFile" type="button">📄 文件</button></div>
+  <input id="img" type="file" accept="image/*" multiple class="hide">
+  <input id="file" type="file" accept="image/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx" multiple class="hide">
+  <div id="picked" style="margin-top:8px;font-size:14px"></div>
+  <label>发到</label>
+  <select id="target"><option value="latest">最近的会话</option><option value="new">新会话</option></select>
+  <label>说点什么（可选）</label>
+  <textarea id="prompt" rows="3" placeholder="例如：帮我看看这张图里写了什么"></textarea>
+  <button id="go">发送</button>
+  <button class="sec" id="forget" type="button">清除令牌</button>
+</div>
+<div id="log"></div>
+<script>
+const $=id=>document.getElementById(id);const K="leqi_bridge_token";let files=[];
+const tok=()=>localStorage.getItem(K)||"";const log=t=>$("log").textContent=t;
+function view(){ $("tokBox").classList.toggle("hide",!!tok()); $("main").classList.toggle("hide",!tok()); }
+$("saveTok").onclick=async()=>{const t=$("tok").value.trim();if(!t)return;const r=await fetch("/v1/sessions",{headers:{Authorization:"Bearer "+t}});if(r.status===401){log("令牌不对");return;}localStorage.setItem(K,t);$("tok").value="";view();loadLatest();};
+$("forget").onclick=()=>{localStorage.removeItem(K);view();};
+$("pickImg").onclick=()=>$("img").click();$("pickFile").onclick=()=>$("file").click();
+const onPick=e=>{files=files.concat([...e.target.files]);$("picked").textContent=files.map(f=>`${f.name}（${Math.round(f.size/1024)}KB）`).join("\n");};
+$("img").onchange=onPick;$("file").onchange=onPick;
+const api=(m,p,b,h={})=>fetch(p,{method:m,headers:{Authorization:"Bearer "+tok(),...h},body:b}).then(async r=>{const j=await r.json().catch(()=>({}));if(r.status===401){localStorage.removeItem(K);view();}if(!r.ok)throw new Error(j.error||r.status);return j;});
+let latest=null;
+async function loadLatest(){try{const {sessions}=await api("GET","/v1/sessions");latest=sessions[0]||null;$("target").options[0].textContent=latest?`最近的会话：${(latest.title||latest.id).slice(0,24)}`:"最近的会话（暂无，将新建）";}catch(e){}}
+$("go").onclick=async()=>{
+  if(!files.length&&!$("prompt").value.trim()){log("先选文件或写一句话");return;}
+  $("go").disabled=true;try{const atts=[];
+    for(const f of files){ if(f.size>10*1024*1024)throw new Error(f.name+" 超过 10MB"); log(`上传 ${f.name}…`);
+      const r=await api("POST",`/v1/upload?name=${encodeURIComponent(f.name)}`,f,{"Content-Type":f.type||"application/octet-stream"}); atts.push({name:r.name,mime:r.mime,url:r.url}); }
+    const body={prompt:$("prompt").value.trim(),attachments:atts,source:"upload-page"};
+    if($("target").value==="latest"&&latest)body.session_id=latest.id;
+    const r=await api("POST","/v1/command",JSON.stringify(body),{"Content-Type":"application/json"});
+    log(`✅ 已发送 ${atts.length} 个附件到会话 ${r.session.id}\n${r.webhook&&r.webhook.ok?"Grok Bot 已开始处理，回复会出现在眼镜和 Slack。":"已记录，但 webhook 未成功："+JSON.stringify(r.webhook)}`);
+    files=[];$("picked").textContent="";$("prompt").value="";$("img").value="";$("file").value="";loadLatest();
+  }catch(e){log("❌ "+e.message);}finally{$("go").disabled=false;}
+};
+view();if(tok())loadLatest();
+</script></body></html>

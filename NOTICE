@@ -1,0 +1,13 @@
+rokid-glasses-grokbot (open core)
+Copyright (c) 2026 the contributors
+
+This project includes / depends on:
+
+  @rokid-prism/pluginbridge-plugin-sdk
+  Copyright (c) Rokid Prism contributors
+  License: MIT
+  Upstream: https://github.com/Rokid-Prism/prism-plugin-sdk
+  npm: https://www.npmjs.com/package/@rokid-prism/pluginbridge-plugin-sdk
+
+Rokid, Prism, and Glasses product names are trademarks of their respective owners.
+This repository is an independent integration layer and is not an official Rokid product.

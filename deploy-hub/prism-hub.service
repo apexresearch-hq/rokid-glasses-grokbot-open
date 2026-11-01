@@ -1,0 +1,16 @@
+[Unit]
+Description=Prism Hub (headless sidecar)
+After=network-online.target session-bridge.service
+Wants=network-online.target
+[Service]
+User=prism-hub
+Group=prism-hub
+WorkingDirectory=/var/lib/prism-hub
+Environment=HOME=/var/lib/prism-hub
+Environment=PRISM_DESKTOP_MANAGED=1
+ExecStart=/opt/prism-hub/prism-sidecar sidecar -config /var/lib/prism-hub/.prism/config.yaml -db /var/lib/prism-hub/.prism/pluginbridge.sqlite -addr 127.0.0.1:18790
+Restart=always
+RestartSec=5
+MemoryMax=300M
+[Install]
+WantedBy=multi-user.target

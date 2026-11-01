@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Grok Bot · 小说式分页预览</title>
+  <style>
+    :root {
+      --bg: #0a120a;
+      --fg: #7CFF7C;
+      --dim: #3a6b3a;
+      --panel: #101a10;
+      --border: #1e3a1e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Mono", "Menlo", "Consolas", "PingFang SC", monospace;
+      background: radial-gradient(ellipse at top, #142014, var(--bg));
+      color: var(--fg);
+    }
+    header {
+      padding: 16px 20px 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: 0.04em; }
+    .meta { color: var(--dim); font-size: 12px; }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+    .hud {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 24px;
+      min-height: 220px;
+      box-shadow: 0 0 40px rgba(124, 255, 124, 0.06) inset;
+      line-height: 1.75;
+      font-size: 18px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    button, .file-btn {
+      background: transparent;
+      color: var(--fg);
+      border: 1px solid var(--fg);
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+    }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    button:hover:not(:disabled), .file-btn:hover { background: rgba(124,255,124,0.12); }
+    .page-label { min-width: 90px; text-align: center; color: var(--dim); }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      background: var(--panel);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font: inherit;
+      font-size: 13px;
+      resize: vertical;
+    }
+    input[type="number"], input[type="text"] {
+      background: var(--panel);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+      width: 110px;
+    }
+    input[type="text"].wide { width: min(360px, 100%); }
+    details {
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    summary { cursor: pointer; color: var(--dim); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+    .hint { font-size: 12px; color: var(--dim); margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Grok Bot · 小说式分页预览</h1>
+      <div class="meta" id="status">离线演示可用 · 左右键翻页</div>
+    </div>
+    <div class="meta" id="title"></div>
+  </header>
+  <main>
+    <div class="hud" id="hud" aria-live="polite">粘贴正文，或从会话拉取章节…</div>
+    <div class="controls">
+      <button id="prev" type="button">← 上一页</button>
+      <span class="page-label" id="pageLabel">第 0 / 0 页</span>
+      <button id="next" type="button">下一页 →</button>
+      <label class="meta">每页字数
+        <input id="cpp" type="number" min="40" max="800" value="180" />
+      </label>
+    </div>
+
+    <details open>
+      <summary>正文来源</summary>
+      <div class="row">
+        <button id="demo" type="button">载入演示正文</button>
+        <button id="applyPaste" type="button">用下方粘贴分页</button>
+        <label class="file-btn">打开本地 txt
+          <input id="file" type="file" accept=".txt,text/plain" hidden />
+        </label>
+      </div>
+      <textarea id="paste" placeholder="在此粘贴 Bot 回传的全文…"></textarea>
+      <div class="row">
+        <input id="apiBase" class="wide" type="text" placeholder="API 基址，默认当前源" />
+        <input id="sessionId" class="wide" type="text" placeholder="session id" />
+        <button id="loadSession" type="button">拉会话章节</button>
+      </div>
+      <div class="hint">URL 参数：?session=…&amp;chapter=…&amp;charsPerPage=180&amp;api=http://127.0.0.1:8787</div>
+      <div id="chapters" class="hint"></div>
+    </details>
+  </main>
+  <script>
+    // Inline paginate — works fully offline (no bridge needed)
+    function paginate(text, charsPerPage) {
+      const n = Math.max(1, Math.floor(Number(charsPerPage) || 180));
+      const src = String(text ?? "");
+      if (!src) return [""];
+      const pages = [];
+      let i = 0;
+      while (i < src.length) {
+        let end = Math.min(i + n, src.length);
+        if (end < src.length) {
+          const window = src.slice(i, end);
+          const soft = window.search(/[\s。！？；，、：\n][^\s。！？；，、：\n]*$/);
+          if (soft > Math.floor(n * 0.55)) end = i + soft + 1;
+        }
+        pages.push(src.slice(i, end));
+        i = end;
+      }
+      return pages.length ? pages : [""];
+    }
+
+    const DEMO = [
+      "This is a novel-style reading preview for smart glasses HUD pagination.",
+      "完整对话不会做成手机聊天气泡，而是把 Grok Bot 回传的全文切成短绿字页。",
+      "你可以用左右方向键或下方按钮翻页，手感接近看小说或提词器。",
+      "会话桥把全文存在 chapters.json；眼镜侧只显示当前页。",
+      "Slack 可发原文；通知只提醒「有新章」，真正阅读走本分页器或未来的 AIUI CustomView。",
+      "没有眼镜时，用本页验证：粘贴 → 分页 → 翻页。通了再接 Webhook 与 Prism 插件。"
+    ].join("");
+
+    const state = {
+      text: "",
+      pages: [""],
+      page: 1,
+      title: "",
+      mode: "local", // local | api
+      apiBase: "",
+      sessionId: "",
+      chapterId: "",
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function qs() {
+      return new URLSearchParams(location.search);
+    }
+
+    function cpp() {
+      return Number($("cpp").value) || 180;
+    }
+
+    function renderLocal() {
+      state.pages = paginate(state.text, cpp());
+      if (state.page > state.pages.length) state.page = state.pages.length;
+      if (state.page < 1) state.page = 1;
+      $("hud").textContent = state.pages[state.page - 1] || "";
+      $("pageLabel").textContent = `第 ${state.page} / ${state.pages.length} 页`;
+      $("prev").disabled = state.page <= 1;
+      $("next").disabled = state.page >= state.pages.length;
+      $("title").textContent = state.title || "";
+      $("status").textContent =
+        state.mode === "api"
+          ? `API 分页 · ${state.sessionId} / ${state.chapterId}`
+          : "本地分页 · 左右键翻页";
+    }
+
+    async function renderApi() {
+      const base = (state.apiBase || location.origin).replace(/\/$/, "");
+      const url =
+        `${base}/v1/sessions/${encodeURIComponent(state.sessionId)}` +
+        `/chapters/${encodeURIComponent(state.chapterId)}/pages` +
+        `?page=${state.page}&charsPerPage=${cpp()}`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(await r.text());
+      const data = await r.json();
+      $("hud").textContent = data.text || "";
+      $("pageLabel").textContent = `第 ${data.page} / ${data.totalPages} 页`;
+      $("prev").disabled = data.page <= 1;
+      $("next").disabled = data.page >= data.totalPages;
+      state.page = data.page;
+      state._total = data.totalPages;
+      $("title").textContent = data.title || state.title || "";
+      $("status").textContent = `API 分页 · charsPerPage=${cpp()}`;
+    }
+
+    async function render() {
+      try {
+        if (state.mode === "api" && state.sessionId && state.chapterId) {
+          await renderApi();
+        } else {
+          renderLocal();
+        }
+      } catch (e) {
+        $("status").textContent = "错误: " + e.message;
+      }
+    }
+
+    function setText(text, title) {
+      state.mode = "local";
+      state.text = text;
+      state.title = title || "";
+      state.page = 1;
+      render();
+    }
+
+    $("prev").onclick = () => {
+      state.page -= 1;
+      render();
+    };
+    $("next").onclick = () => {
+      state.page += 1;
+      render();
+    };
+    $("cpp").onchange = () => {
+      state.page = 1;
+      render();
+    };
+    $("demo").onclick = () => setText(DEMO, "演示章");
+    $("applyPaste").onclick = () => setText($("paste").value, "粘贴正文");
+    $("file").onchange = async (ev) => {
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      setText(await f.text(), f.name);
+    };
+
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "ArrowLeft") {
+        ev.preventDefault();
+        $("prev").click();
+      } else if (ev.key === "ArrowRight") {
+        ev.preventDefault();
+        $("next").click();
+      }
+    });
+
+    $("loadSession").onclick = async () => {
+      state.apiBase = $("apiBase").value.trim();
+      state.sessionId = $("sessionId").value.trim();
+      if (!state.sessionId) {
+        $("status").textContent = "请填写 session id";
+        return;
+      }
+      const base = (state.apiBase || location.origin).replace(/\/$/, "");
+      const r = await fetch(`${base}/v1/sessions/${encodeURIComponent(state.sessionId)}`);
+      if (!r.ok) {
+        $("status").textContent = "拉会话失败: " + (await r.text());
+        return;
+      }
+      const data = await r.json();
+      const list = data.chapters || [];
+      $("chapters").innerHTML = list.length
+        ? "章节: " +
+          list
+            .map(
+              (c) =>
+                `<a href="#" data-cid="${c.id}" style="color:var(--fg)">${c.title}</a>`
+            )
+            .join(" · ")
+        : "该会话暂无章节（先 POST /v1/ingest）";
+      $("chapters").onclick = (ev) => {
+        const a = ev.target.closest("a[data-cid]");
+        if (!a) return;
+        ev.preventDefault();
+        state.mode = "api";
+        state.chapterId = a.dataset.cid;
+        state.title = a.textContent;
+        state.page = 1;
+        render();
+      };
+      if (list.length) {
+        state.mode = "api";
+        state.chapterId = list[list.length - 1].id;
+        state.title = list[list.length - 1].title;
+        state.page = 1;
+        render();
+      }
+    };
+
+    // Bootstrap from query
+    (function init() {
+      const q = qs();
+      if (q.get("api")) {
+        $("apiBase").value = q.get("api");
+        state.apiBase = q.get("api");
+      }
+      if (q.get("charsPerPage")) $("cpp").value = q.get("charsPerPage");
+      if (q.get("session")) {
+        $("sessionId").value = q.get("session");
+        state.sessionId = q.get("session");
+        if (q.get("chapter")) {
+          state.mode = "api";
+          state.chapterId = q.get("chapter");
+          state.page = Number(q.get("page") || 1);
+          render();
+        } else {
+          $("loadSession").click();
+        }
+      } else {
+        setText(DEMO, "演示章");
+      }
+    })();
+  </script>
+</body>
+</html>
